@@ -9,7 +9,7 @@ def GetPrice(Token):
     querystring = {"ids":Token,"vs_currencies":"usd"}
 
     headers = {
-        'x-rapidapi-key': "5fcb43a5c4msh65a15c1ec141a34p12acd7jsncca1350fd29a",
+        'x-rapidapi-key': "XXXX",
         'x-rapidapi-host': "coingecko.p.rapidapi.com"
         }
     
