@@ -192,7 +192,7 @@ def MainLoop(ImageCanvas=[]):
             elif event.action == "pressed" and event.direction == "middle":
                 cursor_color = ChangeColor(cursor_color)
 
-            elif event.action =="held" and event.direction == "middle":
+            elif event.action == "held" and event.direction == "middle":
                 # Save and quit
                 SaveImage()
                 Menu()

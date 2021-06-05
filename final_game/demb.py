@@ -18,16 +18,57 @@ wall_colour = (255,255,0)
 hole_colour = (255,0,0)
 background_colour = (25,25,25)
 
-# Player class
-class Player:
-    # Default to 3 health, and start in the middle
-    def __init__(self, x=4, y=4, color=(0, 0, 255), health=3):
+# Parent Generic Class
+class Generic:
+    def __init__(self,obj_type,x=0,y=0,color=(0,0,0)):
         self.x = x
         self.y = y
         self.color = color
-        self.health = health
+        self.obj_type = obj_type
         self.alive = True
+    
+    def move(self, direction, map):
+        # move in direction
+        if (direction == "left") and (self.check_move(walls=map["walls"],direction="left")):
+            if self.x >= 1:
+                self.x -= 1
+        elif (direction == "right") and (self.check_move(walls=map["walls"],direction="right")):
+            if self.x < 7:
+                self.x += 1
+        elif (direction == "down") and (self.check_move(walls=map["walls"],direction="down")):
+            if self.y >= 1:
+                self.y -= 1
+        elif (direction == "up") and (self.check_move(walls=map["walls"],direction="up")):
+            if self.y < 7:
+                self.y += 1
+
+    def check_move(self, walls, direction):
+        # validate move direction
+        result = True
+
+        # Itterate over walls
+        for aWall in walls:
+            if ((self.x +1)== aWall[0]) and (direction == "right"):
+                result = False
+            elif ((self.x -1)==aWall[0]) or (direction == "left"):
+                result = False
+            elif ((self.y +1)==aWall[1]) or (direction == "up"):
+                result = False
+            elif ((self.y -1)==aWall[1]) or (direction == "down"):
+                result = False
         
+        return result
+
+# Player class
+class Player(Generic):
+    # Default to 3 health, and start in the middle
+    def __init__(self, x=4, y=4, color=(0, 0, 255)):
+        self.x = x
+        self.y = y
+        self.color = color
+        self.health = 3
+        self.obj_type = "player"
+    
     def take_damage(self):
         # Reduce health by 1 and change color
         self.health -= 1
@@ -37,21 +78,7 @@ class Player:
             self.color = (57, 58, 152)
         elif self.health == 0:
             self.alive = False
-            
-    def move(self, direction):
-        # move in direction
-        if direction == "left":
-            if self.x >= 1:
-                self.x -= 1
-        elif direction == "right":
-            if self.x < 7:
-                self.x += 1
-        elif direction == "up":
-            if self.y >= 1:
-                self.y -= 1
-        else:
-            if self.y < 7:
-                self.y += 1
+        
 # Zombie class
 class Zombie:
     def __init__(self, x, y, init=0, speed=5):
@@ -61,29 +88,21 @@ class Zombie:
         self.init = init
         self.color = (51, 255, 51)
     
-    def move(self, target_player, wall_list):
-        #Pass a player object to head toward player x,y
-        move_options = self.check_area(walls=wall_list, target=target_player)
+    def should_move(self):
+        if  self.init == self.speed:
+                # Check moves
+            self.init = 0
+            return True
+        else:
+            self.init += 1
+            return False
 
-        moved = False
-        # move x
-        if target_player.x > self.x and bool(move_options["right"]):
-            self.x += 1
-            moved = True
-        elif target_player.x < self.x and bool(move_options["left"]):
-            self.x -= 1
-            moved = True
-        elif target_player.x == self.x:
+    def move(self, target_player, map):
+        # Check Init then move if right
+        if  self.should_move():
+            # Make Move
             pass
-        
-        # move y
-        if not moved:
-            if target_player.y > self.y and bool(move_options["up"]):
-                self.y += 1
-            elif target_player.y < self.y and bool(move_options["down"]):
-                self.y -=1
-            elif target_player.y == self.y:
-                pass
+
 
     def check_death(self, holes):
         # Check if on a death spot
@@ -91,38 +110,25 @@ class Zombie:
         for aHole in holes:
             if (self.x == aHole[0]) & (self.y == aHole[1]):
                 # Zombie in a hole
-                result = True
+                self.alive = False
 
         # Return result
         return result
-    # Check Collisions
-    def check_area(self, walls, target):
-        # Function to return outcome
-        # Return array of outcomes
-        # Itterate over walls
-        result = {"right" : False, "left" : False, "down": False, "up": False}
 
-        # Itterate over walls
-        for aWall in walls:
-            if ((self.x +1)== aWall[0]) or (self.x == 7):
-                result["right"] = True
-            elif ((self.x -1)==aWall[0]) or (self.x == 0):
-                result["left"] = True
-            elif ((self.y +1)==aWall[1]) or (self.y == 7):
-                result["down"] = True
-            elif ((self.y -1)==aWall[1]) or (self.y == 0):
-                result["up"] = True
-        
+    def i_can_chomp(self,player):
+        # Check to see if chomp
         # Check for bite
+        # Return True / False for screen flash
         chomp = False
-        if (((self.x +1) == target.x) or ((self.x -1)== target.x)) and (((self.y +1)== target.y) or ((self.y -1)==target.y)):
+        if (((self.x +1) == player.x) or ((self.x -1)== player.x)) and (((self.y +1)== player.y) or ((self.y -1)==player.y)):
             chomp = True
         
         # Do damage
         if chomp:
-            target.take_damage()
+            player.take_damage()
 
-        return result
+        # Return outcome
+        return chomp
 
 # Create Maps
 def get_map(id=1):
@@ -151,78 +157,105 @@ def get_map(id=1):
 
     return result
 
-# Start A New Game
-def new_game(level=1):
-    # Function For New Game
-    aPlayer = Player()
-    zombie_list = []
+# Helper Functions
+def draw_map(map):
+    # Paint the display Background color
+    sense.clear()
+    sense.set_pixels([background_colour] * 64)
 
-    # Get the map
-    map = get_map(level)
+    # Draw Walls & Holes
+    for aWall in map['walls']:
+        sense.set_pixel(aWall[0],aWall[1],wall_colour)
+    for aHole in map['holes']:
+        sense.set_pixel(aHole[0],aHole[1],hole_colour)
 
+def draw_player(character):
+    # Draw the location of the character
+    sense.set_pixel(character.x, character.y, character.color)
+
+def check_game_condition(player,zombies):
+    # Return True for keep playing, false for stop
+    result = True
+    if not player.alive:
+        # Player died
+        result = False
+    elif len(zombies) == 0:
+        # Last Zombie Dead
+        result = False
+    return result
+    
+def spawn_zombies(map):
     # Spawn the zombies
+    result = []
     for aZombie in map['zombies']:
         new_zombie = Zombie(x=aZombie[0],y=aZombie[1],speed=aZombie[2])
-        zombie_list.append(new_zombie)
+        result.append(new_zombie)
+    return result
 
+def chomp():
+    # Player Chomped Flash Red
+    sense.set_pixels((255,0,0) * 64)
+    time.sleep(0.2)
+
+# Primary Game Loop
+def game_loop(map,player):
+    zombie_list = spawn_zombies(map=map)
     # Main Game Loop
     game_running = True
     while game_running:
-        # Game logic
-        
-        # Paint the display Background color
-        sense.clear()
-        sense.set_pixels([background_colour] * 64)
-
+        # Draw map
+        draw_map(map=map)
         # Draw Player
-        sense.set_pixel(aPlayer.x, aPlayer.y, aPlayer.color)
-
-        # Draw Walls & Holes
-        for aWall in map['walls']:
-            sense.set_pixel(aWall[0],aWall[1],wall_colour)
-        for aHole in map['holes']:
-            sense.set_pixel(aHole[0],aHole[1],hole_colour)
-
-        # Draw Zombies
+        draw_player(character=player)
+        # Move, draw, chomp zombies
+        player_chomped = False
         for aZombie in zombie_list:
-            # Stall the zombies, move every other cycle
-            if  aZombie.init == aZombie.speed:
-                # Check moves
-                aZombie.move(target_player=aPlayer, wall_list=map['walls'])
-                aZombie.init = 0
-            else:
-                aZombie.init += 1
-
-            # Always draw the zombies
-            if not aZombie.check_death(map['holes']):
-                sense.set_pixel(aZombie.x, aZombie.y, aZombie.color)
-            else:
-                # Kill zombie
-                zombie_list.remove(aZombie)
+            # Move
+            aZombie.move(target_player=player,map=map)
+            # Draw pizel
+            draw_player(character=aZombie)
+            # Check chomp
+            if aZombie.i_can_chomp(player=player):
+                player_chomped = True
         
         # Capture input
         for event in sense.stick.get_events():
             if event.action == "pressed" and event.direction != "middle":
-                aPlayer.move(event.direction)
+                player.move(event.direction)
         
         # Wait
         time.sleep(0.5)
 
+        # Flash the screen if chomped
+        if player_chomped:
+            chomp()
+
         # Check end round conditions
-        if not aPlayer.alive:
-            # Player died
-            game_running = False
-        elif len(zombie_list) == 0:
-            # Last Zombie Dead
-            game_running = False
-    
+        game_running = check_game_condition(player=player,zombies=zombie_list)
+
     # Post Game Loop
-    return (aPlayer.alive)
+    return (player.alive)
+
+# Game Controller
+def game_controller():
+    # Function For New Game
+    aPlayer = Player()
+    current_level = 1
+
+    # Run game
+    while outcome:
+        map = get_map(id=current_level)
+        outcome = game_loop(map=map, player=aPlayer)
+        if outcome:
+            print("Winner")
+            current_level += 1
+        else:
+            print("Died")
+
+game_controller()
+
+
     
-# Main loop
-current_level = 1
-outcome = new_game(level=current_level)
-if outcome:
-    print("Winner")
-else:
-    print("Died")
+    
+
+    
