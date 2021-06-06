@@ -140,6 +140,9 @@ class Zombie(Generic):
             #only try four moves before stepping back
             if count == 3:
                 self.move(map=map, direction=self.safe_move)
+                moved = True
+            else:
+                count += 1
 
 
     def check_death(self, holes):
