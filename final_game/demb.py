@@ -20,27 +20,35 @@ background_colour = (25,25,25)
 
 # Parent Generic Class
 class Generic:
-    def __init__(self,obj_type,x=0,y=0,color=(0,0,0)):
+    def __init__(self,x=0,y=0,color=(0,0,0)):
         self.x = x
         self.y = y
         self.color = color
-        self.obj_type = obj_type
         self.alive = True
     
     def move(self, direction, map):
         # move in direction
+        moved = False
+        
         if (direction == "left") and (self.check_move(walls=map["walls"],direction="left")):
             if self.x >= 1:
                 self.x -= 1
+            moved = True
         elif (direction == "right") and (self.check_move(walls=map["walls"],direction="right")):
             if self.x < 7:
                 self.x += 1
+            moved = True
         elif (direction == "down") and (self.check_move(walls=map["walls"],direction="down")):
-            if self.y >= 1:
-                self.y -= 1
-        elif (direction == "up") and (self.check_move(walls=map["walls"],direction="up")):
             if self.y < 7:
                 self.y += 1
+            moved = True
+        elif (direction == "up") and (self.check_move(walls=map["walls"],direction="up")):
+            if self.y >= 1:
+                self.y -= 1
+            moved = True
+
+        return moved
+
 
     def check_move(self, walls, direction):
         # validate move direction
@@ -48,14 +56,22 @@ class Generic:
 
         # Itterate over walls
         for aWall in walls:
-            if ((self.x +1)== aWall[0]) and (direction == "right"):
+            if ((self.x +1) == aWall[0]) and ((self.y)== aWall[1]) and (direction == "right"):
+                print(f"Denied Direction: {direction} -- x,y: {self.x +1},{self.y}, wall x,y: {aWall[0]},{aWall[1]}")
                 result = False
-            elif ((self.x -1)==aWall[0]) or (direction == "left"):
+                break
+            elif ((self.x -1) ==aWall[0]) and ((self.y)== aWall[1]) and (direction == "left"):
+                print(f"Denied Direction: {direction} -- x,y: {self.x -1},{self.y}, wall x,y: {aWall[0]},{aWall[1]}")
                 result = False
-            elif ((self.y +1)==aWall[1]) or (direction == "up"):
+                break
+            elif ((self.x) == aWall[0]) and ((self.y +1)==aWall[1]) and (direction == "up"):
+                print(f"Denied Direction: {direction} -- x,y: {self.x},{self.y +1}, wall x,y: {aWall[0]},{aWall[1]}")
                 result = False
-            elif ((self.y -1)==aWall[1]) or (direction == "down"):
+                break
+            elif ((self.x) == aWall[0]) and ((self.y -1)==aWall[1]) and (direction == "down"):
+                print(f"Denied Direction: {direction}x,y: {self.x},{self.y -1}, wall x,y: {aWall[0]},{aWall[1]}")
                 result = False
+                break
         
         return result
 
@@ -63,11 +79,8 @@ class Generic:
 class Player(Generic):
     # Default to 3 health, and start in the middle
     def __init__(self, x=4, y=4, color=(0, 0, 255)):
-        self.x = x
-        self.y = y
-        self.color = color
+        super().__init__(x=x,y=y,color=color)
         self.health = 3
-        self.obj_type = "player"
     
     def take_damage(self):
         # Reduce health by 1 and change color
@@ -80,13 +93,12 @@ class Player(Generic):
             self.alive = False
         
 # Zombie class
-class Zombie:
-    def __init__(self, x, y, init=0, speed=5):
-        self.x = x
-        self.y = y
+class Zombie(Generic):
+    def __init__(self, x, y, init=0, speed=5, color=(51, 255, 51)):
+        super().__init__(x=x,y=y,color=color)
         self.speed = speed
         self.init = init
-        self.color = (51, 255, 51)
+        safe_move = ""
     
     def should_move(self):
         if  self.init == self.speed:
@@ -97,11 +109,37 @@ class Zombie:
             self.init += 1
             return False
 
-    def move(self, target_player, map):
+    def zombie_move(self, target_player, map):
         # Check Init then move if right
-        if  self.should_move():
-            # Make Move
-            pass
+        if not self.should_move():
+            # Dont make a move
+            return
+        
+        # Make decision on move
+        moved = False
+        count = 0
+        while not moved:
+            if target_player.x > self.x:
+                if self.move(map=map,direction= "right"):
+                    moved = True
+                    self.safe_move = "left"
+            elif target_player.x < self.y:
+                if self.move(map=map,direction= "left"):
+                    moved = True
+                    self.safe_move = "right"
+            elif target_player.y > self.y:
+                if self.move(map=map, direction = "down"):
+                    moved = True
+                    self.safe_move = "up"
+            elif target_player.y < self.y:
+                if self.move(map=map, direction= "up"):
+                    moved = True
+                    self.safe_move = "down"
+
+            
+            #only try four moves before stepping back
+            if count == 3:
+                self.move(map=map, direction=self.safe_move)
 
 
     def check_death(self, holes):
@@ -211,7 +249,7 @@ def game_loop(map,player):
         player_chomped = False
         for aZombie in zombie_list:
             # Move
-            aZombie.move(target_player=player,map=map)
+            aZombie.zombie_move(target_player=player,map=map)
             # Draw pizel
             draw_player(character=aZombie)
             # Check chomp
@@ -221,7 +259,7 @@ def game_loop(map,player):
         # Capture input
         for event in sense.stick.get_events():
             if event.action == "pressed" and event.direction != "middle":
-                player.move(event.direction)
+                player.move(map=map,direction=event.direction)
         
         # Wait
         time.sleep(0.5)
@@ -241,6 +279,7 @@ def game_controller():
     # Function For New Game
     aPlayer = Player()
     current_level = 1
+    outcome = True
 
     # Run game
     while outcome:
